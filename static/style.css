@@ -1,0 +1,130 @@
+:root {
+  --bg: #f7f2e9;
+  --panel: #fffaf0;
+  --ink: #2d2a26;
+  --accent: #6c8e8e;
+  --border: #d7cbb5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", Verdana, sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at top left, #fbead1, var(--bg));
+}
+
+h1, h2 {
+  margin: 0 0 0.6rem 0;
+  font-weight: 700;
+}
+
+h1 { font-size: 1.6rem; }
+
+h2 { font-size: 1.1rem; color: #4a3c2b; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 20px;
+  padding: 20px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+}
+
+section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 4px;
+}
+
+input {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #c7b89a;
+}
+
+button {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(0.95);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: end;
+}
+
+.list {
+  font-size: 0.85rem;
+  padding: 6px;
+  background: #f0e8d8;
+  border-radius: 6px;
+  min-height: 28px;
+}
+
+.canvas-wrap {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+}
+
+#road {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #f6f6f6;
+  border-radius: 8px;
+}
+
+.status {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #5a4a35;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #2d2a26;
+  color: #fff8e8;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.1s ease;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

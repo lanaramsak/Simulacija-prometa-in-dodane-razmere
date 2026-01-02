@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="sl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Simulacija prometa</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="layout">
+    <div class="panel">
+      <h1>Simulacija prometa</h1>
+
+      <section>
+        <h2>Cesta</h2>
+        <label>Dolzina ceste <input id="dolzina" type="number" min="10" value="60" /></label>
+        <label>P(zaviranja) <input id="pZaviranja" type="number" step="0.05" min="0" max="1" value="0.2" /></label>
+      </section>
+
+      <section>
+        <h2>Omejitve hitrosti</h2>
+        <div class="row">
+          <label>Od <input id="limOd" type="number" min="0" value="10" /></label>
+          <label>Do <input id="limDo" type="number" min="1" value="25" /></label>
+          <label>Max <input id="limMax" type="number" min="1" value="5" /></label>
+          <button id="addLimit">Dodaj omejitev</button>
+        </div>
+        <div id="limitsList" class="list"></div>
+      </section>
+
+      <section>
+        <h2>Avti</h2>
+        <div class="row">
+          <label>Pozicija <input id="carPoz" type="number" min="0" value="5" /></label>
+          <label>Pas <input id="carPas" type="number" min="0" value="0" /></label>
+          <label>Max hitrost <input id="carMax" type="number" min="1" value="5" /></label>
+          <button id="addCar">Dodaj avto</button>
+        </div>
+        <div class="row">
+          <label>Gostota <input id="randGostota" type="number" step="0.05" min="0" max="1" value="0.2" /></label>
+          <label>Max hitrost od <input id="randMin" type="number" min="1" value="3" /></label>
+          <label>Max hitrost do <input id="randMax" type="number" min="1" value="6" /></label>
+          <button id="randomCars">Nakljucni avti</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Ovire</h2>
+        <div class="row">
+          <label>Pozicija <input id="obsPoz" type="number" min="0" value="15" /></label>
+          <label>Pas <input id="obsPas" type="number" min="0" value="0" /></label>
+          <button id="addObstacle">Dodaj oviro</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Simulacija</h2>
+        <div class="row">
+          <button id="init">Inicializiraj</button>
+          <button id="step">Korak</button>
+          <button id="toggle">Zacni</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="road" width="900" height="360"></canvas>
+      <div id="tooltip" class="tooltip"></div>
+      <div id="status" class="status">Ni modela</div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
