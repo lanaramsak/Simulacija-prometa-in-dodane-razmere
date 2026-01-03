@@ -16,6 +16,7 @@ def serialize_state():
             "avti": [],
             "ovire": [],
             "omejitve": [],
+            "lookahead": 0,
         }
 
     avti = [
@@ -42,6 +43,7 @@ def serialize_state():
         "avti": avti,
         "ovire": ovire,
         "omejitve": omejitve,
+        "lookahead": model.lookahead,
     }
 
 
@@ -66,11 +68,13 @@ def init():
     p_zaviranje = float(data.get("p_zaviranje", 0.2))
     omejitve = data.get("omejitve", [])
     ovire = data.get("ovire", [])
+    lookahead = int(data.get("lookahead", 15))  # koliko celic naprej gledajo avti
 
     model = Cesta(
         dolzina_ceste=dolzina_ceste,
         p_zaviranje=p_zaviranje,
         omejitve=omejitve,
+        lookahead=lookahead,
     )
 
     # Dodatne ovire - dodala ker jih je prej prepisal
@@ -106,6 +110,18 @@ def set_limits():
     return jsonify({"ok": True})
 
 
+@app.post("/set_lookahead")
+def set_lookahead():
+    # Nastavi koliko celic naprej avti gledajo
+    data = request.get_json(force=True)
+    if model is None:
+        return jsonify({"ok": False, "error": "Model not initialized"}), 400
+
+    lookahead = int(data.get("lookahead", 15))
+    model.lookahead = lookahead
+    return jsonify({"ok": True})
+
+
 @app.post("/add_car")
 def add_car():
     # Dodan avto v model
@@ -116,7 +132,8 @@ def add_car():
     poz = int(data.get("poz", 0))
     pas = int(data.get("pas", 0))
     max_hitrost = int(data.get("max_hitrost", 5))
-    ok = model.add_car(poz, pas, max_hitrost)
+    color = data.get("color")
+    ok = model.add_car(poz, pas, max_hitrost, color=color)
     return jsonify({"ok": ok})
 
 

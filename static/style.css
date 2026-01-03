@@ -87,6 +87,20 @@ button:hover {
   min-height: 28px;
 }
 
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.list-remove {
+  padding: 4px 6px;
+  background: #b13b2c;
+  border-color: #b13b2c;
+}
+
 .canvas-wrap {
   position: relative;
   background: #fff;
@@ -94,6 +108,7 @@ button:hover {
   border-radius: 12px;
   padding: 12px;
   box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+  min-height: 620px;
 }
 
 #road {
@@ -102,6 +117,7 @@ button:hover {
   display: block;
   background: #f6f6f6;
   border-radius: 8px;
+  min-height: 560px;
 }
 
 .status {

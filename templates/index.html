@@ -15,6 +15,10 @@
         <h2>Cesta</h2>
         <label>Dolzina ceste <input id="dolzina" type="number" min="10" value="60" /></label>
         <label>P(zaviranja) <input id="pZaviranja" type="number" step="0.05" min="0" max="1" value="0.2" /></label>
+        <div class="row">
+          <label>Lookahead <input id="lookahead" type="number" min="1" value="15" /></label>
+          <button id="setLookahead">Nastavi lookahead</button>
+        </div>
       </section>
 
       <section>
@@ -26,6 +30,16 @@
           <button id="addLimit">Dodaj omejitev</button>
         </div>
         <div id="limitsList" class="list"></div>
+      </section>
+
+      <section>
+        <h2>Ovire</h2>
+        <div class="row">
+          <label>Pozicija <input id="obsPoz" type="number" min="0" value="15" /></label>
+          <label>Pas <input id="obsPas" type="number" min="0" value="0" /></label>
+          <label>Dolzina <input id="obsLen" type="number" min="1" value="1" /></label>
+          <button id="addObstacle">Dodaj oviro</button>
+        </div>
       </section>
 
       <section>
@@ -45,26 +59,33 @@
       </section>
 
       <section>
-        <h2>Ovire</h2>
-        <div class="row">
-          <label>Pozicija <input id="obsPoz" type="number" min="0" value="15" /></label>
-          <label>Pas <input id="obsPas" type="number" min="0" value="0" /></label>
-          <button id="addObstacle">Dodaj oviro</button>
-        </div>
-      </section>
-
-      <section>
         <h2>Simulacija</h2>
         <div class="row">
+          <label>Vizualizacija
+            <select id="viewMode">
+              <option value="linear">Ravna cesta</option>
+              <option value="circle">Krozna cesta</option>
+            </select>
+          </label>
+          <label><input id="showGrid" type="checkbox" checked /> Prikazi celice</label>
           <button id="init">Inicializiraj</button>
           <button id="step">Korak</button>
           <button id="toggle">Zacni</button>
         </div>
       </section>
+
+      <section>
+        <h2>Scenariji</h2>
+        <div class="row">
+          <button id="scenario1">Scenarij 1</button>
+          <button id="scenario2">Scenarij 2</button>
+          <button id="scenario3">Scenarij 3</button>
+        </div>
+      </section>
     </div>
 
     <div class="canvas-wrap">
-      <canvas id="road" width="900" height="360"></canvas>
+      <canvas id="road" width="1000" height="560"></canvas>
       <div id="tooltip" class="tooltip"></div>
       <div id="status" class="status">Ni modela</div>
     </div>
