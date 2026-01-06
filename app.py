@@ -25,6 +25,8 @@ def serialize_state():
             "pas": avto.pas,
             "hitrost": avto.hitrost,
             "max_hitrost": avto.max_hitrost,
+            "tip": avto.tip,
+            "dolzina": avto.dolzina,
             "color": avto.color,
         }
         for avto in model.avti
@@ -82,7 +84,19 @@ def init():
         model.add_obstacle(int(ovira.get("poz", 0)), int(ovira.get("pas", 0)))
 
     # Random avti
-    if data.get("random", False):
+    if data.get("random_vozila", False):
+        gostota = float(data.get("gostota", 0.1))
+        max_hitrost_interval = data.get("max_hitrost_interval")
+        if max_hitrost_interval:
+            max_hitrost_interval = (
+                int(max_hitrost_interval[0]),
+                int(max_hitrost_interval[1]),
+            )
+        model.random_vozila(
+            gostota=gostota,
+            max_hitrost_interval=max_hitrost_interval,
+        )
+    elif data.get("random", False):
         gostota = float(data.get("gostota", 0.1))
         max_hitrost_interval = data.get("max_hitrost_interval")
         if max_hitrost_interval:
@@ -122,8 +136,8 @@ def set_lookahead():
     return jsonify({"ok": True})
 
 
-@app.post("/add_car")
-def add_car():
+@app.post("/add_vozilo")
+def add_vozilo():
     # Dodan avto v model
     data = request.get_json(force=True)
     if model is None:
@@ -132,8 +146,9 @@ def add_car():
     poz = int(data.get("poz", 0))
     pas = int(data.get("pas", 0))
     max_hitrost = int(data.get("max_hitrost", 5))
+    tip = data.get("tip", "avto")
     color = data.get("color")
-    ok = model.add_car(poz, pas, max_hitrost, color=color)
+    ok = model.add_vozilo(poz, pas, max_hitrost, color=color, tip=tip)
     return jsonify({"ok": ok})
 
 

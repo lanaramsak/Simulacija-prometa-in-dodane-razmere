@@ -112,7 +112,7 @@ async function runScenario(config) {
   });
   if (config.cars && config.cars.length) {
     for (const car of config.cars) {
-      await api("/add_car", car);
+      await api("/add_vozilo", car);
     }
   }
   const state = await fetchState();
@@ -317,6 +317,11 @@ function draw(state) {
 
   // Avti
   for (const avto of state.avti || []) {
+    const dolzina = Math.max(1, Number(avto.dolzina || 1));
+    const positions = [];
+    for (let i = 0; i < dolzina; i += 1) {
+      positions.push((avto.poz - i + len) % len);
+    }
     let x;
     let y;
     if (mode === "linear") {
@@ -334,11 +339,28 @@ function draw(state) {
     }
     ctx.fillStyle = avto.color || "#2a9d8f";
     if (mode === "linear") {
-      ctx.fillRect(x + 2, y + 2, cellW - 4, cellH - 4);
+      for (const pos of positions) {
+        const cellX = padX + pos * cellW;
+        ctx.fillRect(cellX + 2, y + 2, cellW - 4, cellH - 4);
+      }
     } else { //avto krog
-      ctx.beginPath();
-      ctx.arc(x, y, 7, 0, Math.PI * 2);
-      ctx.fill();
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const centerRadius = Math.min(canvas.width, canvas.height) * 0.44;
+      const laneSpacing = 34;
+      const radius = centerRadius + (avto.pas === 0 ? -laneSpacing / 2 : laneSpacing / 2);
+      const arc = (2 * Math.PI) / len;
+      ctx.save();
+      ctx.strokeStyle = avto.color || "#2a9d8f";
+      ctx.lineWidth = laneSpacing - 12;
+      ctx.lineCap = "round";
+      for (const pos of positions) {
+        const baseAngle = (pos / len) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, baseAngle - arc * 0.45, baseAngle + arc * 0.45);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
     lastCarPositions.push({ x, y, avto });
   }
@@ -359,7 +381,7 @@ function hideTooltip() {
   tooltipEl.style.opacity = "0";
 }
 
-async function initModel(random) {
+async function initModel(random, randomVehicles) {
   // Inicializacija modela na backendu
   // random=true pomeni, da backend takoj doda nakljucne avte
   const params = getParams();
@@ -368,6 +390,7 @@ async function initModel(random) {
     omejitve: limits,
     ovire: obstacles,
     random: Boolean(random),
+    random_vozila: Boolean(randomVehicles),
   };
   if (random) {
     payload.gostota = Number(document.getElementById("randGostota").value);
@@ -418,13 +441,15 @@ document.getElementById("addLimit").addEventListener("click", () => {
 document.getElementById("init").addEventListener("click", () => initModel(false));
 
 document.getElementById("randomCars").addEventListener("click", () => initModel(true));
+document.getElementById("randomVehicles").addEventListener("click", () => initModel(true, true));
 
 document.getElementById("addCar").addEventListener("click", async () => {
   // Dodamo avto
-  await api("/add_car", {
+  await api("/add_vozilo", {
     poz: Number(document.getElementById("carPoz").value),
     pas: Number(document.getElementById("carPas").value),
     max_hitrost: Number(document.getElementById("carMax").value),
+    tip: document.getElementById("carType").value,
   });
   const state = await fetchState();
   draw(state);
@@ -501,7 +526,7 @@ canvas.addEventListener("mousemove", (event) => {
 
     const avto = (lastState.avti || []).find((a) => a.poz === poz && a.pas === pas);
     if (avto) {
-      showTooltip(`hitrost: ${avto.hitrost}, max: ${avto.max_hitrost}`, xWrap, yWrap);
+      showTooltip(`tip: ${avto.tip || "avto"}, hitrost: ${avto.hitrost}, max: ${avto.max_hitrost}`, xWrap, yWrap);
     } else {
       hideTooltip();
     }
@@ -521,7 +546,7 @@ canvas.addEventListener("mousemove", (event) => {
     }
   }
   if (closest && minDist < 12) {
-    showTooltip(`hitrost: ${closest.hitrost}, max: ${closest.max_hitrost}`, xWrap, yWrap);
+    showTooltip(`tip: ${avto.tip || "avto"}, hitrost: ${closest.hitrost}, max: ${closest.max_hitrost}`, xWrap, yWrap);
   } else {
     hideTooltip();
   }

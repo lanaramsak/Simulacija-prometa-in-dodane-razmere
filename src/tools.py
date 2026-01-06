@@ -5,16 +5,21 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Circle, Wedge
 import matplotlib.colors as mcolors
 
-RANDOM_MEJA = 0.2
+TIPI_VOZIL = {
+    "avto": 1,
+    "limuzina": 3,
+    "tovornjak": 6,
+}
 
 class Avto:
     """predstavlja avto v modelu"""
-    def __init__(self, poz, pas=0, hitrost=0, max_hitrost=5, color=None):
+    def __init__(self, poz, pas=0, hitrost=0, max_hitrost=5, color=None, tip="avto"):
         self.poz = poz          # index celice
         self.hitrost = hitrost
         self.pas = pas
         self.max_hitrost = max_hitrost
-        self.last_lane_change = -10**9
+        self.tip = tip
+        self.dolzina = TIPI_VOZIL[tip]
         if color:
             self.color = color
         else:
@@ -27,7 +32,6 @@ class Avto:
                 if (r + g + b) >= 120:
                     self.color = "#{:06x}".format(value)
                     break
-
 
     def update_hitrost(self, razdalja, omejitev=None, front_speed=None, limit_ahead=None):
         """sprejme razdaljo do naslednjega avta in temu ustrezno spremeni hitrost"""
@@ -107,7 +111,7 @@ class Cesta:
         gostota = gostota / self.st_pasov
         for pas in range(self.st_pasov):
             for i in range(self.dolzina_ceste):  # Random postavitev avtov
-                if random.random() < gostota and self.cesta[pas][i] is None:
+                if random.random() < gostota and self.cesta[pas][i] == None:
                     avto_max_hitrost = (
                         random.randint(*max_hitrost_interval)
                         if max_hitrost_interval
@@ -117,12 +121,37 @@ class Cesta:
                     self.avti.append(avto)
                     self.cesta[pas][i] = avto
 
-    def add_car(self, pozicija, pas, max_hitrost, color=None):
-        # Rocno doda avto na cesto, ce je celica prosta.
-        if self.cesta[pas][pozicija] == None:
-            avto = Avto(pozicija, pas=pas, max_hitrost=max_hitrost, color=color)
+    def random_vozila(self, max_hitrost=5, max_hitrost_interval=None, gostota=0.05):
+        # Nakljucno razporedi vozila - lahko tudi tovrnjak po pasovih glede na gostoto.
+        gostota = gostota / self.st_pasov
+        for pas in range(self.st_pasov):
+            for i in range(self.dolzina_ceste):  # Random postavitev avtov
+                if random.random() < gostota:
+                    r = random.random()
+                    if r < 0.6:
+                        vozilo = "avto"
+                    elif r < 0.8:
+                        vozilo = "limuzina"
+                    else:
+                        vozilo = "tovornjak"
+                    vozilo_dolzina = TIPI_VOZIL.get(vozilo, 1)
+                    if not self.lahko_postavis(pas, i, vozilo_dolzina):
+                        continue
+                    avto_max_hitrost = (
+                        random.randint(*max_hitrost_interval)
+                        if max_hitrost_interval
+                        else max_hitrost
+                    )
+                    avto = Avto(i, pas=pas, max_hitrost=avto_max_hitrost, tip=vozilo)
+                    self.avti.append(avto)
+                    self.avto_na_cesti(self.cesta, avto)
+
+    def add_vozilo(self, pozicija, pas, max_hitrost, tip, color=None):
+        # Rocno dodamo vozilo na cesto, ce je celica prosta.
+        if self.lahko_postavis(pas, pozicija, TIPI_VOZIL[tip]):
+            avto = Avto(pozicija, pas=pas, max_hitrost=max_hitrost, color=color, tip=tip)
             self.avti.append(avto)
-            self.cesta[pas][pozicija] = avto
+            self.avto_na_cesti(self.cesta, avto)
             return True
         else:
             return False
@@ -172,21 +201,24 @@ class Cesta:
 
     def razdalja_do_naslednjega(self, pas, pozicija):
         """Izračuna razdaljo do naslednjega avtomobila"""
+        # ne sme videt samega sebe, ko pogleda naprej, preveri če je to slučajno isto objekt
         razdalja = 1
-        while self.cesta[pas][(pozicija + razdalja) % self.dolzina_ceste] is None: #ce je prazno mesto
-            razdalja += 1
-            if razdalja > self.dolzina_ceste:  #za vsak slučaj
-                return None
-        return razdalja - 1  #povečamo preden preverimo za naslednjo mesto
-    
-    def razdalja_do_prejsnjega(self, pas, pozicija):
-        """Izračuna razdaljo do prejšnjega avtomobila zadaj"""
-        razdalja = 1
-        while self.cesta[pas][(pozicija - razdalja) % self.dolzina_ceste] is None:
+        while self.cesta[pas][(pozicija + razdalja) % self.dolzina_ceste] is None:
             razdalja += 1
             if razdalja > self.dolzina_ceste:
                 return None
         return razdalja - 1
+        
+    
+    def razdalja_do_prejsnjega(self, pas, pozicija, avto):
+        """Izračuna razdaljo do prejšnjega avtomobila zadaj"""
+        # steje sele po temu ko pride do konca samega sebe
+        razdalja = avto.dolzina
+        while self.cesta[pas][(pozicija - razdalja) % self.dolzina_ceste] is None:
+            razdalja += 1
+            if razdalja > self.dolzina_ceste:
+                return None
+        return razdalja - avto.dolzina
 
     def korak_simulacije(self):
         """En korak simulacije"""
@@ -196,13 +228,14 @@ class Cesta:
         lane_changes = []
         for avto in self.avti:
             novi_pas = should_change_lane(self, avto, self.cas, lookahead=self.lookahead)
-            if novi_pas is not None and self.cesta[novi_pas][avto.poz] is None:
+            # to ubistvu preverim že v lane change?
+            if novi_pas is not None and self.lahko_postavis(novi_pas, avto.poz, avto.dolzina):
                 lane_changes.append((avto, novi_pas))
+
         for avto, novi_pas in lane_changes:
-            self.cesta[avto.pas][avto.poz] = None
+            self.odstrani_avto_na_cesti(self.cesta, avto)
             avto.pas = novi_pas
-            avto.last_lane_change = self.cas
-            self.cesta[avto.pas][avto.poz] = avto
+            self.avto_na_cesti(self.cesta, avto)
 
         # Posodobitev hitrosti
         for avto in self.avti:
@@ -228,10 +261,36 @@ class Cesta:
         for avto in self.avti:
             nova_pozicija = (avto.poz + avto.hitrost) % self.dolzina_ceste
             avto.poz = nova_pozicija
-            nova_cesta[avto.pas][nova_pozicija] = avto
+            self.avto_na_cesti(nova_cesta, avto)
         
         self.cesta = nova_cesta
         self.cas += 1
+
+    def pozicija_skupaj(self, pozicija_glava, dolzina):
+        # dobim od kje do kje je avto
+        return [((pozicija_glava - i) % self.dolzina_ceste) for i in range(dolzina)]
+    
+    def avto_na_cesti(self, cesta, avto, pas=None, pozicija=None):
+        # da se mi obarvajo celice ceste enako
+        pas = avto.pas if pas is None else pas #da loh uporabim pri testiranju za prehitevanje
+        pozicija = avto.poz if pozicija is None else pozicija
+        for poz in self.pozicija_skupaj(pozicija, avto.dolzina):
+            cesta[pas][poz] = avto
+
+    def odstrani_avto_na_cesti(self, cesta, avto, pas=None, pozicija=None):
+        pas = avto.pas if pas is None else pas
+        pozicija = avto.poz if pozicija is None else pozicija
+        for pos in self.pozicija_skupaj(pozicija, avto.dolzina):
+            if cesta[pas][pos] is avto:
+                cesta[pas][pos] = None
+
+    def lahko_postavis(self, pas, pozicija, dolzina, avto=None):
+        # spet potrebno da ko gleda ne vidi sebe, ker se bo itak prestavil
+        for poz in self.pozicija_skupaj(pozicija, dolzina):
+            obj = self.cesta[pas][poz]
+            if obj is not None and obj != avto: 
+                return False
+        return True
     
 def should_change_lane(cesta, avto, cas,
                        lookahead=15,
@@ -253,7 +312,7 @@ def should_change_lane(cesta, avto, cas,
 
     ##### TRENUTNI PAS  
     razdalja_spredaj, front_speed, limit_ahead = cesta.info_naprej(pas, poz, lookahead)
-    print(razdalja_spredaj, front_speed, limit_ahead)
+    # print(razdalja_spredaj, front_speed, limit_ahead)
     naslednja_hitrost = avto.update_hitrost(razdalja_spredaj, omejitev, front_speed, limit_ahead)
 
     # mora nujno zavirati
@@ -266,7 +325,7 @@ def should_change_lane(cesta, avto, cas,
     spredaj_slow_avto = front_speed is not None and front_speed < trenutna_hitrost  # je to okej tako, lahko da oba upočasnujeta zaradi omejitve
 
     # Za njim hiter avto in se mora umakniti
-    razdalja_zadaj_trenutni = cesta.razdalja_do_prejsnjega(pas, poz)
+    razdalja_zadaj_trenutni = cesta.razdalja_do_prejsnjega(pas, poz, avto)
     avto_zadaj = None
     if razdalja_zadaj_trenutni is not None and razdalja_zadaj_trenutni <= lookahead:
         poz_zadaj = (poz - razdalja_zadaj_trenutni) % L
@@ -286,7 +345,7 @@ def should_change_lane(cesta, avto, cas,
     # Pred njim počasen avto, ni nujno da je že na razdalji, da je potrebno zavirati
     spredaj_slow_avto_D = front_speed_D is not None and front_speed_D < trenutna_hitrost  # je to okej tako, lahko da oba upočasnujeta zaradi omejitve
 
-    razdalja_zadaj_D = cesta.razdalja_do_prejsnjega(1-pas, poz)
+    razdalja_zadaj_D = cesta.razdalja_do_prejsnjega(1-pas, poz, avto)
     avto_zadaj = None
     if razdalja_zadaj_D is not None and razdalja_zadaj_D <= lookahead:
         poz_zadaj = (poz - razdalja_zadaj_D) % L
@@ -298,7 +357,7 @@ def should_change_lane(cesta, avto, cas,
     # Menjava iz desnega v levi pas (prehitevanje)
     if pas == 0:
         # lahko sploh menjamo
-        if cesta.cesta[1-pas][poz] is not None:
+        if not cesta.lahko_postavis(1-pas, avto.poz, avto.dolzina):
             return None
 
         motivacija = bo_moral_zavirati or spredaj_slow_avto or (sosednja_mozna_hitrost > naslednja_hitrost) #to primerjavo moram dati stran, saj sicer ne morem imeti random zaviranja
@@ -309,7 +368,7 @@ def should_change_lane(cesta, avto, cas,
 
     # Menjava iz levega v desni pas (vracanje).
     if pas == 1:
-        if cesta.cesta[1-pas][poz] is not None:
+        if not cesta.lahko_postavis(1-pas, avto.poz, avto.dolzina):
             return None
 
         ni_vec_potrebe_za_prehitevanje = (not bo_moral_zavirati_D) and (not spredaj_slow_avto_D)
@@ -464,7 +523,7 @@ def vizualizacija_kroga(model, koraki=100):
     ax1.set_ylim(-plot_radius-1, plot_radius+1)
     ax1.set_aspect('equal')
     ax1.set_title('Krožna vizualizacija prometa\n(Barva = hitrost)', fontsize=14)
-    ax1.grid(True, alpha=0.3)
+    ax1.cesta(True, alpha=0.3)
     
     # Priprava časovnega grafa
     časovna_os = list(range(koraki))
@@ -474,7 +533,7 @@ def vizualizacija_kroga(model, koraki=100):
     ax2.set_xlabel('Čas (koraki)')
     ax2.set_ylabel('Povprečna hitrost')
     ax2.set_title('Razvoj hitrosti skozi čas')
-    ax2.grid(True, alpha=0.3)
+    ax2.cesta(True, alpha=0.3)
     line, = ax2.plot([], [], 'b-', linewidth=2)
     
     def init():
