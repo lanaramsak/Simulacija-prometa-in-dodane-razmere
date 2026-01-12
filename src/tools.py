@@ -6,9 +6,9 @@ from matplotlib.patches import Circle, Wedge
 import matplotlib.colors as mcolors
 
 TIPI_VOZIL = {
-    "avto": 1,
-    "limuzina": 3,
-    "tovornjak": 6,
+    "avto": 6,
+    "limuzina": 10,
+    "tovornjak": 20,
 }
 
 class Avto:
@@ -17,6 +17,7 @@ class Avto:
         self.poz = poz          # index celice
         self.hitrost = hitrost
         self.pas = pas
+        self.max_hitrost_base = max_hitrost
         self.max_hitrost = max_hitrost
         self.tip = tip
         self.dolzina = TIPI_VOZIL[tip]
@@ -57,7 +58,8 @@ class Avto:
         if razdalja is not None:  # lahko je razdalja = 0
             ## če ima spredni avto hitrost je premik lahko večji
             if front_speed is not None:
-                target = min(target, razdalja + front_speed)
+                # Naj bo varno pri sočasnem posodabljanju: ne prehiti razdalje do avta.
+                target = min(target, razdalja)
 
             ## spredaj ovira, lahko se premaknemo samo za razdaljo
             else:
@@ -103,6 +105,8 @@ class Cesta:
         self.avti = []
         self.ovire = []
         self.cesta_omejitve = [None] * dolzina_ceste
+        self.truck_cap_enabled = False
+        self.truck_max_speed = 4
         if omejitve:
             self.set_omejitve(omejitve)
 
@@ -111,15 +115,15 @@ class Cesta:
         gostota = gostota / self.st_pasov
         for pas in range(self.st_pasov):
             for i in range(self.dolzina_ceste):  # Random postavitev avtov
-                if random.random() < gostota and self.cesta[pas][i] == None:
+                if random.random() < gostota and self.lahko_postavis(pas, i, TIPI_VOZIL["avto"]):
                     avto_max_hitrost = (
                         random.randint(*max_hitrost_interval)
                         if max_hitrost_interval
                         else max_hitrost
                     )
-                    avto = Avto(i, pas=pas, max_hitrost=avto_max_hitrost)
+                    avto = Avto(i, pas=pas, max_hitrost=avto_max_hitrost, tip="avto")
                     self.avti.append(avto)
-                    self.cesta[pas][i] = avto
+                    self.avto_na_cesti(self.cesta, avto)
 
     def random_vozila(self, max_hitrost=5, max_hitrost_interval=None, gostota=0.05):
         # Nakljucno razporedi vozila - lahko tudi tovrnjak po pasovih glede na gostoto.
@@ -143,6 +147,8 @@ class Cesta:
                         else max_hitrost
                     )
                     avto = Avto(i, pas=pas, max_hitrost=avto_max_hitrost, tip=vozilo)
+                    if self.truck_cap_enabled and vozilo == "tovornjak":
+                        avto.max_hitrost = min(avto.max_hitrost_base, self.truck_max_speed)
                     self.avti.append(avto)
                     self.avto_na_cesti(self.cesta, avto)
 
@@ -150,6 +156,8 @@ class Cesta:
         # Rocno dodamo vozilo na cesto, ce je celica prosta.
         if self.lahko_postavis(pas, pozicija, TIPI_VOZIL[tip]):
             avto = Avto(pozicija, pas=pas, max_hitrost=max_hitrost, color=color, tip=tip)
+            if self.truck_cap_enabled and tip == "tovornjak":
+                avto.max_hitrost = min(avto.max_hitrost_base, self.truck_max_speed)
             self.avti.append(avto)
             self.avto_na_cesti(self.cesta, avto)
             return True
@@ -161,6 +169,27 @@ class Cesta:
         ovira = Ovira(pozicija, pas)
         self.ovire.append(ovira)
         self.cesta[pas][pozicija] = ovira
+    
+    def remove_obstacle(self, pozicija, pas):
+        # Odstrani oviro s ceste in iz seznama ovir.
+        for idx, ovira in enumerate(self.ovire):
+            if ovira.poz == pozicija and ovira.pas == pas:
+                self.ovire.pop(idx)
+                if isinstance(self.cesta[pas][pozicija], Ovira):
+                    self.cesta[pas][pozicija] = None
+                return True
+        return False
+
+    def set_truck_cap(self, enabled, max_speed=4):
+        self.truck_cap_enabled = bool(enabled)
+        self.truck_max_speed = max_speed
+        for avto in self.avti:
+            if avto.tip != "tovornjak":
+                continue
+            if self.truck_cap_enabled:
+                avto.max_hitrost = min(avto.max_hitrost_base, self.truck_max_speed)
+            else:
+                avto.max_hitrost = avto.max_hitrost_base
 
     def set_omejitve(self, omejitve):
         # Nastavi omejitve hitrosti po pozicijah ceste.
@@ -169,7 +198,7 @@ class Cesta:
             for i in range(omejitev["od"], omejitev["do"]):
                 if 0 <= i < self.dolzina_ceste:
                     self.cesta_omejitve[i] = omejitev["max_hitrost"]
-        print(self.cesta)
+        # print(self.cesta)
 
     def omejitev_na_poziciji(self, pozicija):
         # Vrne omejitev hitrosti na poziciji ali None, ce je ni.
@@ -304,16 +333,30 @@ def should_change_lane(cesta, avto, cas,
     if cesta.st_pasov < 2:
         return None
 
+    def ovira_razdalja(pas_local):
+        """Vrne razdaljo do prve ovire naprej v lookahead oknu."""
+        for d in range(1, lookahead + 1):
+            poz_chk = (poz + d) % L
+            if isinstance(cesta.cesta[pas_local][poz_chk], Ovira):
+                return d
+        return None
+
     pas = avto.pas
     poz = avto.poz
     L = cesta.dolzina_ceste
     trenutna_hitrost = avto.hitrost
     omejitev = cesta.omejitev_na_poziciji(avto.poz)
+    merge_window = max(6, lookahead // 2)
 
     ##### TRENUTNI PAS  
     razdalja_spredaj, front_speed, limit_ahead = cesta.info_naprej(pas, poz, lookahead)
     # print(razdalja_spredaj, front_speed, limit_ahead)
-    naslednja_hitrost = avto.update_hitrost(razdalja_spredaj, omejitev, front_speed, limit_ahead)
+    naslednja_hitrost = avto.update_hitrost(
+        razdalja_spredaj,
+        omejitev,
+        front_speed,
+        limit_ahead,
+    )
 
     # mora nujno zavirati
     bo_moral_zavirati = razdalja_spredaj is not None and razdalja_spredaj <= trenutna_hitrost
@@ -335,9 +378,14 @@ def should_change_lane(cesta, avto, cas,
         avto_zadaj.hitrost >= trenutna_hitrost + delta_hitrost_hitri_zadaj)
     
     ##### DRUGI PAS
-    razdalja_spredaj_D, front_speed_D, limit_ahead = cesta.info_naprej(1-pas, avto.poz, lookahead)
-    print(f"{(razdalja_spredaj_D, front_speed_D, limit_ahead)}")
-    sosednja_mozna_hitrost = avto.update_hitrost(razdalja_spredaj_D, omejitev, front_speed_D, limit_ahead)
+    razdalja_spredaj_D, front_speed_D, limit_ahead_D = cesta.info_naprej(1-pas, avto.poz, lookahead)
+    # print(f"{(razdalja_spredaj_D, front_speed_D, limit_ahead_D)}")
+    sosednja_mozna_hitrost = avto.update_hitrost(
+        razdalja_spredaj_D,
+        omejitev,
+        front_speed_D,
+        limit_ahead_D,
+    )
 
     # mora nujno zavirati (ne zaradi omejitve)
     bo_moral_zavirati_D = razdalja_spredaj_D is not None and razdalja_spredaj_D <= trenutna_hitrost
@@ -354,6 +402,13 @@ def should_change_lane(cesta, avto, cas,
     hiter_avto_zadaj_D = (isinstance(avto_zadaj, Avto) and
         avto_zadaj.hitrost >= trenutna_hitrost + delta_hitrost_hitri_zadaj)
 
+    ovira_dist_trenutni = ovira_razdalja(pas)
+    ovira_dist_drugi = ovira_razdalja(1 - pas)
+    merge_intent = ovira_dist_trenutni is not None and ovira_dist_trenutni <= merge_window
+    if pas == 1 and ovira_dist_drugi is not None and ovira_dist_drugi <= merge_window:
+        # Ne vleci nazaj v pas, ki se zapira zaradi ovire.
+        return None
+
     # Menjava iz desnega v levi pas (prehitevanje)
     if pas == 0:
         # lahko sploh menjamo
@@ -361,10 +416,10 @@ def should_change_lane(cesta, avto, cas,
             return None
 
         motivacija = bo_moral_zavirati or spredaj_slow_avto or (sosednja_mozna_hitrost > naslednja_hitrost) #to primerjavo moram dati stran, saj sicer ne morem imeti random zaviranja
-        incentive = motivacija and (not hiter_avto_zadaj_D)
-        print(sosednja_mozna_hitrost,naslednja_hitrost)
-        print("trenutna", trenutna_hitrost)
-        print(f"bo_moral_zavirati {bo_moral_zavirati}, spredaj_slow_avto {spredaj_slow_avto}, primerjaava {(sosednja_mozna_hitrost > naslednja_hitrost)}")
+        incentive = (motivacija or merge_intent) and (not hiter_avto_zadaj_D)
+        # print(sosednja_mozna_hitrost,naslednja_hitrost)
+        # print("trenutna", trenutna_hitrost)
+        # print(f"bo_moral_zavirati {bo_moral_zavirati}, spredaj_slow_avto {spredaj_slow_avto}, primerjaava {(sosednja_mozna_hitrost > naslednja_hitrost)}")
 
     # Menjava iz levega v desni pas (vracanje).
     if pas == 1:
@@ -377,7 +432,7 @@ def should_change_lane(cesta, avto, cas,
             ni_vec_potrebe_za_prehitevanje
             or motivacija_hiter_zadaj 
             or bo_moral_zavirati_ovira)
-        print(f"ni_vec_potrebe_za_prehitevanje: {ni_vec_potrebe_za_prehitevanje}, bo_moral_zavirati_D {bo_moral_zavirati_D}, spredaj_slow_avto_D {spredaj_slow_avto_D}")
+        # print(f"ni_vec_potrebe_za_prehitevanje: {ni_vec_potrebe_za_prehitevanje}, bo_moral_zavirati_D {bo_moral_zavirati_D}, spredaj_slow_avto_D {spredaj_slow_avto_D}")
         
     if incentive:
         # razdalja_pred = cesta.razdalja_do_naslednjega(1-pas, poz)
@@ -387,10 +442,14 @@ def should_change_lane(cesta, avto, cas,
         if razdalja_zadaj_D is None:
             razdalja_zadaj_D = L
 
+        eff_gap_back = safe_gap_back
+        if merge_intent:
+            # Zadrga: tik pred oviro dovolimo manjso razdaljo zadaj.
+            eff_gap_back = max(1, safe_gap_back - 1)
         security = (razdalja_spredaj_D >= safe_gap_front and
-                    razdalja_zadaj_D >= safe_gap_back)
-        if security == False:
-            print("Ne dovolim prehitevati")
+                    razdalja_zadaj_D >= eff_gap_back)
+        # if security == False:
+        #     # print("Ne dovolim prehitevati")
         return (1-pas) if security else None
     else:
         return None

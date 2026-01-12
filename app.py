@@ -17,6 +17,7 @@ def serialize_state():
             "ovire": [],
             "omejitve": [],
             "lookahead": 0,
+            "truck_cap_enabled": False,
         }
 
     avti = [
@@ -46,6 +47,7 @@ def serialize_state():
         "ovire": ovire,
         "omejitve": omejitve,
         "lookahead": model.lookahead,
+        "truck_cap_enabled": model.truck_cap_enabled,
     }
 
 
@@ -66,11 +68,12 @@ def init():
     # Nardimo nov model (aka cesta, omejitve, ovire)
     global model
     data = request.get_json(force=True)
-    dolzina_ceste = int(data.get("dolzina_ceste", 60))
+    dolzina_ceste = int(data.get("dolzina_ceste", 200))
     p_zaviranje = float(data.get("p_zaviranje", 0.2))
     omejitve = data.get("omejitve", [])
     ovire = data.get("ovire", [])
     lookahead = int(data.get("lookahead", 15))  # koliko celic naprej gledajo avti
+    truck_cap_enabled = bool(data.get("truck_cap_enabled", False))
 
     model = Cesta(
         dolzina_ceste=dolzina_ceste,
@@ -78,6 +81,7 @@ def init():
         omejitve=omejitve,
         lookahead=lookahead,
     )
+    model.set_truck_cap(truck_cap_enabled, max_speed=4)
 
     # Dodatne ovire - dodala ker jih je prej prepisal
     for ovira in ovire:
@@ -136,6 +140,18 @@ def set_lookahead():
     return jsonify({"ok": True})
 
 
+@app.post("/set_truck_cap")
+def set_truck_cap():
+    data = request.get_json(force=True)
+    if model is None:
+        return jsonify({"ok": False, "error": "Model not initialized"}), 400
+
+    enabled = bool(data.get("enabled", False))
+    max_speed = int(data.get("max_speed", 4))
+    model.set_truck_cap(enabled, max_speed=max_speed)
+    return jsonify({"ok": True})
+
+
 @app.post("/add_vozilo")
 def add_vozilo():
     # Dodan avto v model
@@ -163,6 +179,22 @@ def add_obstacle():
     pas = int(data.get("pas", 0))
     model.add_obstacle(poz, pas)
     return jsonify({"ok": True})
+
+@app.post("/remove_obstacle")
+def remove_obstacle():
+    # Odstrani oviro s ceste.
+    data = request.get_json(force=True)
+    if model is None:
+        return jsonify({"ok": False, "error": "Model not initialized"}), 400
+
+    start = int(data.get("poz", 0))
+    pas = int(data.get("pas", 0))
+    dolzina = int(data.get("len", 1))
+    ok = False
+    for i in range(max(dolzina, 1)):
+        poz = (start + i) % model.dolzina_ceste
+        ok = model.remove_obstacle(poz, pas) or ok
+    return jsonify({"ok": ok})
 
 
 @app.post("/step")

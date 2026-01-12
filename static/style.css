@@ -126,6 +126,21 @@ button:hover {
   color: #5a4a35;
 }
 
+.controls-under {
+  margin-top: 16px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.controls-under button {
+  padding: 12px 20px;
+  font-size: 1rem;
+  border-radius: 10px;
+  min-width: 140px;
+}
+
 .tooltip {
   position: absolute;
   pointer-events: none;
